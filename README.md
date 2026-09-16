@@ -50,3 +50,21 @@ src/
 Implementadas con expresiones regulares propias en `src/utils/validators.js`
 (sin librería externa de esquemas, ver justificación en el informe técnico):
 nombre/apellido, CI boliviano, celular boliviano y correo electrónico.
+
+## Despliegue en GitHub Pages
+
+Este proyecto ya está configurado para funcionar en cualquier subcarpeta de
+GitHub Pages (`base: './'` en `vite.config.js` + `HashRouter` en vez de
+`BrowserRouter`), así que **no hace falta tocar nada** por el nombre del
+repositorio.
+
+```bash
+npm run build
+npm install -D gh-pages   # una sola vez
+npx gh-pages -d dist      # publica /dist en la rama gh-pages
+```
+
+Luego, en GitHub → Settings → Pages, selecciona la rama `gh-pages` como
+fuente (o `main` con carpeta `/docs` si prefieren copiar `dist` ahí en vez de
+usar `gh-pages`). La URL quedará como
+`https://<usuario>.github.io/<nombre-repo>/#/`.

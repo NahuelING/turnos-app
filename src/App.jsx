@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { HashRouter, Routes, Route } from "react-router-dom";
 import { DataProvider } from "./context/DataContext";
 import Layout from "./components/Layout";
 import Inicio from "./pages/Inicio";
@@ -12,7 +12,7 @@ import CancelarTurno from "./pages/CancelarTurno";
 export default function App() {
   return (
     <DataProvider>
-      <BrowserRouter>
+      <HashRouter>
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<Inicio />} />
@@ -23,7 +23,7 @@ export default function App() {
             <Route path="cancelar" element={<CancelarTurno />} />
           </Route>
         </Routes>
-      </BrowserRouter>
+      </HashRouter>
     </DataProvider>
   );
 }
