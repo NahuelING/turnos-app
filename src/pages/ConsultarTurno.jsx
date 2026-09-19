@@ -30,7 +30,7 @@ export default function ConsultarTurno() {
       <h2 className="text-2xl text-pine">Consultar turno</h2>
       <p className="mt-1 text-sm text-ink/70">Busca los turnos de un paciente por su CI.</p>
 
-      <form onSubmit={handleSubmit} noValidate className="mt-6 flex gap-3">
+      <form onSubmit={handleSubmit} noValidate className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
           <FormField label="CI del paciente" error={error}>
             <input
@@ -41,11 +41,9 @@ export default function ConsultarTurno() {
             />
           </FormField>
         </div>
-        <div className="pt-6">
-          <button type="submit" className="rounded-md bg-pine px-5 py-2.5 text-clay hover:bg-pine-light">
-            Buscar
-          </button>
-        </div>
+        <button type="submit" className="w-full rounded-md bg-pine px-5 py-3 text-clay hover:bg-pine-light sm:w-auto sm:py-2.5">
+          Buscar
+        </button>
       </form>
 
       {resultados && (

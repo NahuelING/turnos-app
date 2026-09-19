@@ -116,7 +116,7 @@ export default function ReservarTurno() {
           </FormField>
         </div>
         <div className="sm:col-span-2">
-          <button type="submit" className="rounded-md bg-pine px-5 py-2.5 text-clay hover:bg-pine-light">
+          <button type="submit" className="w-full rounded-md bg-pine px-5 py-3 text-clay hover:bg-pine-light sm:w-auto sm:py-2.5">
             Confirmar reserva
           </button>
         </div>

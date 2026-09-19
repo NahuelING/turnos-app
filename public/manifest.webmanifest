@@ -1,0 +1,16 @@
+{
+  "name": "Agenda de Turnos — Centro de Salud Periurbano",
+  "short_name": "Agenda Turnos",
+  "description": "Gestión de turnos médicos del Centro de Salud Periurbano: registrar pacientes, consultar disponibilidad, reservar y cancelar turnos.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "lang": "es",
+  "background_color": "#f6f3ec",
+  "theme_color": "#23473d",
+  "icons": [
+    { "src": "./icons/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
