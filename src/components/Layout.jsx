@@ -72,6 +72,8 @@ export default function Layout() {
   const nombreSesion = sesion?.paciente
     ? `${sesion.paciente.nombre} ${sesion.paciente.apellido}`
     : sesion?.user?.email;
+  const esPaciente = sesion?.user?.rol === "paciente";
+  const enlacesVisibles = enlaces.filter((e) => !(esPaciente && e.to === "/registrar-paciente"));
 
   return (
     <div className="min-h-screen bg-clay">
@@ -111,7 +113,7 @@ export default function Layout() {
         <nav className="mx-auto hidden max-w-5xl overflow-x-auto px-6 pb-3 sm:block">
           <ul className="flex gap-2 text-sm">
             {sesion &&
-              enlaces.map((e) => (
+              enlacesVisibles.map((e) => (
                 <li key={e.to}>
                   <NavLink
                     to={e.to}
@@ -137,7 +139,7 @@ export default function Layout() {
       <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-pine text-clay pb-[env(safe-area-inset-bottom)] sm:hidden">
         <ul className="flex items-stretch justify-around">
           {sesion &&
-            enlaces.map((e) => {
+            enlacesVisibles.map((e) => {
               const nombre = e.to.slice(1);
               return (
                 <li key={e.to} className="flex-1">

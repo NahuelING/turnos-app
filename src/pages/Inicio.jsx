@@ -14,6 +14,8 @@ export default function Inicio() {
   const nombre = sesion?.paciente
     ? `${sesion.paciente.nombre} ${sesion.paciente.apellido}`
     : sesion?.user?.email;
+  const esPaciente = sesion?.user?.rol === "paciente";
+  const casosVisibles = casos.filter((c) => !(esPaciente && c.to === "/registrar-paciente"));
 
   return (
     <section>
@@ -25,7 +27,7 @@ export default function Inicio() {
       </p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        {casos.map((c) => (
+        {casosVisibles.map((c) => (
           <Link
             key={c.to}
             to={c.to}

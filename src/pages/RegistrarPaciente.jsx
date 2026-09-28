@@ -7,11 +7,23 @@ const CAMPOS_INICIALES = { nombre: "", apellido: "", CI: "", telefono: "", corre
 
 // CU01 — Registrar Paciente (crea la cuenta JWT + la ficha en PostgreSQL)
 export default function RegistrarPaciente() {
-  const { registrarPaciente } = useData();
+  const { registrarPaciente, sesion } = useData();
   const [campos, setCampos] = useState(CAMPOS_INICIALES);
   const [errores, setErrores] = useState({});
   const [confirmacion, setConfirmacion] = useState(null);
   const [enviando, setEnviando] = useState(false);
+
+  if (sesion?.user?.rol === "paciente") {
+    return (
+      <section>
+        <h2 className="text-2xl text-pine">Registrar paciente</h2>
+        <p className="mt-3 rounded-md border border-line bg-white px-4 py-3 text-sm text-ink/80">
+          Tu cuenta de paciente ya está registrada. Para reservar o consultar tus
+          turnos usá las opciones del menú.
+        </p>
+      </section>
+    );
+  }
 
   function handleChange(e) {
     const { name, value } = e.target;
