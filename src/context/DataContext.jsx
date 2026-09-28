@@ -112,8 +112,8 @@ export function DataProvider({ children }) {
 
   const reservarTurno = useCallback(async ({ idProfesional, fecha, hora }) => {
     try {
-      const turno = await apiTurnos.reservar({ idProfesional, fecha, hora });
-      return { ok: true, turno };
+      const res = await apiTurnos.reservar({ idProfesional, fecha, hora });
+      return { ok: true, turno: res.turno };
     } catch (e) {
       return { ok: false, mensaje: e.message };
     }
