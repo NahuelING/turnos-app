@@ -1,122 +1,135 @@
-import { createContext, useContext, useEffect, useReducer } from "react";
-import { generarId } from "../utils/id";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { apiAuth, apiPacientes, apiProfesionales, apiTurnos, getToken, setToken } from "../api/client";
 
 // -----------------------------------------------------------------------------
-// Gestión de estados: se centraliza el estado del dominio (pacientes,
-// profesionales, turnos) en un React Context + useReducer en lugar de useState
-// disperso en cada vista. Esto evita "prop drilling" entre las 5 pantallas de
-// los casos de uso, que necesitan leer y escribir sobre las mismas entidades.
-// El estado se persiste en localStorage para simular la capa de persistencia
-// del backend (Capa de Datos) mientras el MVP de frontend no está conectado
-// todavía a la API REST real descrita en la arquitectura de 3 capas.
+// Estado global del dominio conectado a la API REST segura (Flask + PostgreSQL).
+//
+// Los datos viven en la base del backend (Charles2810/turnos-backend): el token
+// JWT del usuario se adjunta a cada request y el backend / RLS recorta los datos
+// a los propios del usuario autenticado.
 // -----------------------------------------------------------------------------
-
-const STORAGE_KEY = "agenda-turnos-mvp";
-
-const PROFESIONALES_SEED = [
-  { idProfesional: "PRF-001", nombre: "Marcela", apellido: "Rojas", especialidad: "Medicina General", telefono: "70011122" },
-  { idProfesional: "PRF-002", nombre: "Diego", apellido: "Fernández", especialidad: "Pediatría", telefono: "70033344" },
-  { idProfesional: "PRF-003", nombre: "Ana", apellido: "Quispe", especialidad: "Odontología", telefono: "70055566" },
-];
 
 const HORAS_JORNADA = ["08:00", "09:00", "10:00", "11:00", "14:00", "15:00", "16:00"];
-
-function estadoInicial() {
-  const guardado = localStorage.getItem(STORAGE_KEY);
-  if (guardado) {
-    try {
-      return JSON.parse(guardado);
-    } catch {
-      // continua a estado por defecto si el JSON está corrupto
-    }
-  }
-  return { pacientes: [], profesionales: PROFESIONALES_SEED, turnos: [] };
-}
-
-function reducer(estado, accion) {
-  switch (accion.type) {
-    case "AGREGAR_PACIENTE": {
-      const nuevo = { idPaciente: generarId("PAC"), ...accion.payload };
-      return { ...estado, pacientes: [...estado.pacientes, nuevo] };
-    }
-    case "AGREGAR_TURNO": {
-      const nuevo = { idTurno: generarId("TUR"), estado: "reservado", ...accion.payload };
-      return { ...estado, turnos: [...estado.turnos, nuevo] };
-    }
-    case "CANCELAR_TURNO": {
-      return {
-        ...estado,
-        turnos: estado.turnos.map((t) =>
-          t.idTurno === accion.payload.idTurno ? { ...t, estado: "cancelado" } : t
-        ),
-      };
-    }
-    default:
-      return estado;
-  }
-}
 
 const DataContext = createContext(null);
 
 export function DataProvider({ children }) {
-  const [estado, dispatch] = useReducer(reducer, undefined, estadoInicial);
+  const [profesionales, setProfesionales] = useState([]);
+  const [catalogoError, setCatalogoError] = useState("");
+  const [sesion, setSesion] = useState(null); // { user: {id, rol}, paciente }
+  const [cargandoSesion, setCargandoSesion] = useState(true);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(estado));
-  }, [estado]);
+    let activo = true;
+    (async () => {
+      try {
+        const lista = await apiProfesionales.listar();
+        if (activo) setProfesionales(lista);
+      } catch (e) {
+        if (activo) setCatalogoError(e.message);
+      }
+
+      const token = getToken();
+      if (token) {
+        try {
+          const res = await apiAuth.me();
+          const u = res.usuario;
+          if (activo) {
+            setSesion({ user: { id: u.id, rol: u.rol, email: u.email }, paciente: u.paciente });
+          }
+        } catch {
+          setToken(null); // token vencido/revocado -> se descarta
+          if (activo) setSesion(null);
+        }
+      }
+      if (activo) setCargandoSesion(false);
+    })();
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  const registrarPaciente = useCallback(async (datos) => {
+    // El backend separa "cuenta de acceso" (auth/register) de la "ficha médica"
+    // (pacientes). Se crea la cuenta, se inicia sesión para obtener el JWT y recién
+    // entonces se registra la ficha del paciente asociada a ese usuario (id_usuario).
+    const base = (datos.correo || "").split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "") || "usuario";
+    const username = `${base}_${Math.random().toString(36).slice(2, 6)}`;
+
+    await apiAuth.registro({
+      username,
+      email: datos.correo,
+      password: datos.password,
+    });
+
+    const loginRes = await apiAuth.login({ username: datos.correo, password: datos.password });
+    setToken(loginRes.access_token);
+
+    const res = await apiPacientes.crear({
+      nombre: datos.nombre,
+      apellido: datos.apellido,
+      CI: datos.CI,
+      telefono: datos.telefono,
+      correo: datos.correo,
+    });
+
+    setSesion({
+      user: { id: loginRes.usuario.id, rol: loginRes.usuario.rol, email: loginRes.usuario.email },
+      paciente: res.paciente,
+    });
+    return { access_token: loginRes.access_token, mensaje: res.mensaje, paciente: res.paciente };
+  }, []);
+
+  const iniciarSesion = useCallback(async ({ correo, password }) => {
+    const res = await apiAuth.login({ username: correo, password });
+    setToken(res.access_token);
+    setSesion({
+      user: { id: res.usuario.id, rol: res.usuario.rol, email: res.usuario.email },
+      paciente: res.usuario.paciente,
+    });
+    return res;
+  }, []);
+
+  const cerrarSesion = useCallback(() => {
+    setToken(null);
+    setSesion(null);
+  }, []);
+
+  const getDisponibilidad = useCallback(async (idProfesional, fecha) => {
+    if (!idProfesional || !fecha) return [];
+    return apiTurnos.disponibilidad(idProfesional, fecha);
+  }, []);
+
+  const reservarTurno = useCallback(async ({ idProfesional, fecha, hora }) => {
+    try {
+      const turno = await apiTurnos.reservar({ idProfesional, fecha, hora });
+      return { ok: true, turno };
+    } catch (e) {
+      return { ok: false, mensaje: e.message };
+    }
+  }, []);
+
+  const buscarTurnos = useCallback(async ({ ci, idTurno }) => {
+    return apiTurnos.listar({ ci, idTurno });
+  }, []);
+
+  const cancelarTurno = useCallback(async (idTurno) => {
+    return apiTurnos.cancelar(idTurno);
+  }, []);
 
   const api = {
-    ...estado,
+    profesionales,
+    catalogoError,
+    sesion,
+    cargandoSesion,
     horasJornada: HORAS_JORNADA,
-
-    agregarPaciente(datos) {
-      dispatch({ type: "AGREGAR_PACIENTE", payload: datos });
-    },
-
-    buscarPacientePorCI(ci) {
-      return estado.pacientes.find((p) => p.CI === ci.trim());
-    },
-
-    // CU02: horarios ocupados = todo turno "reservado" de ese profesional en esa fecha.
-    getDisponibilidad(idProfesional, fecha) {
-      if (!idProfesional || !fecha) return [];
-      const ocupadas = estado.turnos
-        .filter((t) => t.idProfesional === idProfesional && t.fecha === fecha && t.estado === "reservado")
-        .map((t) => t.hora);
-      return HORAS_JORNADA.filter((h) => !ocupadas.includes(h));
-    },
-
-    reservarTurno({ idPaciente, idProfesional, fecha, hora }) {
-      // Regla de negocio (solapamiento de horarios): se vuelve a comprobar
-      // disponibilidad en el momento de reservar, no solo al listar, para
-      // evitar condiciones de carrera entre la consulta y el envío del form.
-      const disponibles = this.getDisponibilidad(idProfesional, fecha);
-      if (!disponibles.includes(hora)) {
-        return { ok: false, mensaje: "Ese horario ya no está disponible. Elige otro." };
-      }
-      dispatch({ type: "AGREGAR_TURNO", payload: { idPaciente, idProfesional, fecha, hora } });
-      return { ok: true };
-    },
-
-    buscarTurnos({ ci, idTurno }) {
-      let lista = estado.turnos;
-      if (idTurno) {
-        lista = lista.filter((t) => t.idTurno.toLowerCase() === idTurno.trim().toLowerCase());
-      } else if (ci) {
-        const paciente = estado.pacientes.find((p) => p.CI === ci.trim());
-        if (!paciente) return [];
-        lista = lista.filter((t) => t.idPaciente === paciente.idPaciente);
-      }
-      return lista.map((t) => ({
-        ...t,
-        paciente: estado.pacientes.find((p) => p.idPaciente === t.idPaciente),
-        profesional: estado.profesionales.find((p) => p.idProfesional === t.idProfesional),
-      }));
-    },
-
-    cancelarTurno(idTurno) {
-      dispatch({ type: "CANCELAR_TURNO", payload: { idTurno } });
-    },
+    registrarPaciente,
+    iniciarSesion,
+    cerrarSesion,
+    getDisponibilidad,
+    reservarTurno,
+    buscarTurnos,
+    cancelarTurno,
   };
 
   return <DataContext.Provider value={api}>{children}</DataContext.Provider>;

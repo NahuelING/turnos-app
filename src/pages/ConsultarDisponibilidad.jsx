@@ -1,41 +1,70 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useData } from "../context/DataContext";
 import FormField, { inputClass } from "../components/FormField";
 import { validarSeleccion } from "../utils/validators";
 
 const HOY = new Date().toISOString().slice(0, 10);
 
-// CU02 — Consultar Disponibilidad
+// CU02 — Consultar Disponibilidad (endpoint público, función SQL security definer)
 export default function ConsultarDisponibilidad() {
-  const { profesionales, getDisponibilidad } = useData();
+  const { profesionales, getDisponibilidad, catalogoError } = useData();
   const [idProfesional, setIdProfesional] = useState("");
   const [fecha, setFecha] = useState(HOY);
   const [errores, setErrores] = useState({});
-  const [buscado, setBuscado] = useState(false);
+  const [disponibles, setDisponibles] = useState([]);
+  const [cargando, setCargando] = useState(false);
+  const [errorApi, setErrorApi] = useState("");
 
-  const disponibles = useMemo(
-    () => getDisponibilidad(idProfesional, fecha),
-    [idProfesional, fecha, getDisponibilidad]
-  );
-
-  function handleSubmit(e) {
-    e.preventDefault();
-    const nuevosErrores = {
-      idProfesional: validarSeleccion(idProfesional, "Elige un profesional."),
-      fecha: validarSeleccion(fecha, "Elige una fecha."),
+  useEffect(() => {
+    let activo = true;
+    if (!idProfesional || !fecha) {
+      setDisponibles([]);
+      return;
+    }
+    setCargando(true);
+    setErrorApi("");
+    getDisponibilidad(idProfesional, fecha)
+      .then((horas) => {
+        if (!activo) return;
+        setDisponibles(horas);
+        setCargando(false);
+      })
+      .catch((e) => {
+        if (!activo) return;
+        setDisponibles([]);
+        setErrorApi(e.message);
+        setCargando(false);
+      });
+    return () => {
+      activo = false;
     };
-    setErrores(nuevosErrores);
-    setBuscado(Object.values(nuevosErrores).every((e) => !e));
-  }
+  }, [idProfesional, fecha, getDisponibilidad]);
 
   return (
     <section>
       <h2 className="text-2xl text-pine">Consultar disponibilidad</h2>
       <p className="mt-1 text-sm text-ink/70">
-        Elige un profesional y una fecha para ver los horarios libres.
+        Elige un profesional y una fecha para ver los horarios libres (consulta
+        pública; la API solo devuelve horas libres, jamás turnos de otros).
       </p>
 
-      <form onSubmit={handleSubmit} noValidate className="mt-6 grid gap-4 sm:grid-cols-2">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const nuevosErrores = {
+            idProfesional: validarSeleccion(idProfesional, "Elige un profesional."),
+            fecha: validarSeleccion(fecha, "Elige una fecha."),
+          };
+          setErrores(nuevosErrores);
+        }}
+        noValidate
+        className="mt-6 grid gap-4 sm:grid-cols-2"
+      >
+        {catalogoError && (
+          <p className="sm:col-span-2 rounded-md border border-brick/40 bg-white px-4 py-3 text-sm text-brick">
+            {catalogoError}
+          </p>
+        )}
         <FormField label="Profesional" error={errores.idProfesional}>
           <select
             className={inputClass}
@@ -59,17 +88,14 @@ export default function ConsultarDisponibilidad() {
             onChange={(e) => setFecha(e.target.value)}
           />
         </FormField>
-        <div className="sm:col-span-2">
-          <button type="submit" className="w-full rounded-md bg-pine px-5 py-3 text-clay hover:bg-pine-light sm:w-auto sm:py-2.5">
-            Ver disponibilidad
-          </button>
-        </div>
       </form>
 
-      {buscado && (
-        <div className="mt-8">
-          <h3 className="text-sm font-medium text-pine">Horarios disponibles</h3>
-          {disponibles.length === 0 ? (
+      <div className="mt-8">
+        <h3 className="text-sm font-medium text-pine">Horarios disponibles</h3>
+        {errorApi && <p className="mt-2 text-sm text-brick">{errorApi}</p>}
+        {cargando && <p className="mt-2 text-sm text-ink/70">Consultando la base de datos…</p>}
+        {!cargando && !errorApi && idProfesional && (
+          disponibles.length === 0 ? (
             <p className="mt-2 text-sm text-ink/70">
               No hay horarios libres para esa fecha con este profesional.
             </p>
@@ -81,9 +107,9 @@ export default function ConsultarDisponibilidad() {
                 </li>
               ))}
             </ul>
-          )}
-        </div>
-      )}
+          )
+        )}
+      </div>
     </section>
   );
 }

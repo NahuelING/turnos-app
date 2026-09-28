@@ -1,21 +1,29 @@
 import { Link } from "react-router-dom";
+import { useData } from "../context/DataContext";
 
 const casos = [
-  { to: "/registrar-paciente", titulo: "Registrar paciente", texto: "Crea la ficha de un nuevo paciente." },
-  { to: "/disponibilidad", titulo: "Consultar disponibilidad", texto: "Revisa horarios libres por profesional y fecha." },
-  { to: "/reservar", titulo: "Reservar turno", texto: "Agenda una cita para un paciente ya registrado." },
-  { to: "/consultar", titulo: "Consultar turno", texto: "Busca los turnos de un paciente por su CI." },
-  { to: "/cancelar", titulo: "Cancelar turno", texto: "Anula un turno usando su código." },
+  { to: "/registrar-paciente", titulo: "Registrar paciente", texto: "Crea la ficha de un nuevo paciente (CU01)." },
+  { to: "/disponibilidad", titulo: "Consultar disponibilidad", texto: "Revisa horarios libres por profesional y fecha (CU02)." },
+  { to: "/reservar", titulo: "Reservar turno", texto: "Agenda una cita para el paciente conectado (CU03)." },
+  { to: "/consultar", titulo: "Consultar turno", texto: "Busca tus turnos por CI (CU04)." },
+  { to: "/cancelar", titulo: "Cancelar turno", texto: "Anula un turno usando su código (CU05)." },
 ];
 
 export default function Inicio() {
+  const { sesion } = useData();
+  const nombre = sesion?.paciente
+    ? `${sesion.paciente.nombre} ${sesion.paciente.apellido}`
+    : sesion?.user?.email;
+
   return (
     <section>
-      <h2 className="text-2xl text-pine">Bienvenido/a</h2>
+      <h2 className="text-2xl text-pine">Bienvenido/a{nombre ? `, ${nombre}` : ""}</h2>
       <p className="mt-2 max-w-xl text-ink/70">
-        Este MVP cubre los cinco casos de uso definidos para la gestión de turnos
-        del centro de salud periurbano. Elige uno para comenzar.
+        MVP de gestión de turnos con backend seguro: API Flask, Supabase con Row
+        Level Security y autenticación JWT. Desde acá podés reservar, consultar y
+        cancelar tus turnos.
       </p>
+
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
         {casos.map((c) => (
           <Link

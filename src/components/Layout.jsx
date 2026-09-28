@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
+import { useData } from "../context/DataContext";
 import logo from "../assets/logo.png";
 
 const enlaces = [
@@ -67,6 +68,11 @@ function Icono({ nombre }) {
 }
 
 export default function Layout() {
+  const { sesion, cerrarSesion } = useData();
+  const nombreSesion = sesion?.paciente
+    ? `${sesion.paciente.nombre} ${sesion.paciente.apellido}`
+    : sesion?.user?.email;
+
   return (
     <div className="min-h-screen bg-clay">
       <header className="border-b border-line bg-pine text-clay">
@@ -78,24 +84,47 @@ export default function Layout() {
             </p>
             <h1 className="truncate text-lg leading-tight sm:text-2xl">Agenda de Turnos</h1>
           </div>
+          <div className="ml-auto flex shrink-0 items-center gap-3">
+            {sesion ? (
+              <>
+                <span className="hidden max-w-[180px] truncate text-xs text-sage md:block">
+                  {nombreSesion}
+                </span>
+                <button
+                  onClick={cerrarSesion}
+                  className="rounded-full border border-clay/40 px-3 py-1.5 text-xs text-clay hover:bg-white/10"
+                >
+                  Cerrar sesión
+                </button>
+              </>
+            ) : (
+              <Link
+                to="/login"
+                className="rounded-full bg-clay px-4 py-1.5 text-sm font-medium text-pine hover:bg-white"
+              >
+                Iniciar sesión
+              </Link>
+            )}
+          </div>
         </div>
         {/* Navegación de escritorio: píldoras bajo el header */}
         <nav className="mx-auto hidden max-w-5xl overflow-x-auto px-6 pb-3 sm:block">
           <ul className="flex gap-2 text-sm">
-            {enlaces.map((e) => (
-              <li key={e.to}>
-                <NavLink
-                  to={e.to}
-                  className={({ isActive }) =>
-                    `block whitespace-nowrap rounded-full px-3 py-1.5 transition ${
-                      isActive ? "bg-clay text-pine font-medium" : "text-clay/80 hover:bg-white/10"
-                    }`
-                  }
-                >
-                  {e.label}
-                </NavLink>
-              </li>
-            ))}
+            {sesion &&
+              enlaces.map((e) => (
+                <li key={e.to}>
+                  <NavLink
+                    to={e.to}
+                    className={({ isActive }) =>
+                      `block whitespace-nowrap rounded-full px-3 py-1.5 transition ${
+                        isActive ? "bg-clay text-pine font-medium" : "text-clay/80 hover:bg-white/10"
+                      }`
+                    }
+                  >
+                    {e.label}
+                  </NavLink>
+                </li>
+              ))}
           </ul>
         </nav>
       </header>
@@ -107,24 +136,25 @@ export default function Layout() {
       {/* Navegación inferior fija para móviles */}
       <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-pine text-clay pb-[env(safe-area-inset-bottom)] sm:hidden">
         <ul className="flex items-stretch justify-around">
-          {enlaces.map((e) => {
-            const nombre = e.to.slice(1);
-            return (
-              <li key={e.to} className="flex-1">
-                <NavLink
-                  to={e.to}
-                  className={({ isActive }) =>
-                    `flex flex-col items-center gap-0.5 py-2 pt-2.5 text-[11px] leading-none transition ${
-                      isActive ? "text-sun font-medium" : "text-clay/70"
-                    }`
-                  }
-                >
-                  <Icono nombre={nombre} />
-                  <span className="mt-1">{e.corta}</span>
-                </NavLink>
-              </li>
-            );
-          })}
+          {sesion &&
+            enlaces.map((e) => {
+              const nombre = e.to.slice(1);
+              return (
+                <li key={e.to} className="flex-1">
+                  <NavLink
+                    to={e.to}
+                    className={({ isActive }) =>
+                      `flex flex-col items-center gap-0.5 py-2 pt-2.5 text-[11px] leading-none transition ${
+                        isActive ? "text-sun font-medium" : "text-clay/70"
+                      }`
+                    }
+                  >
+                    <Icono nombre={nombre} />
+                    <span className="mt-1">{e.corta}</span>
+                  </NavLink>
+                </li>
+              );
+            })}
         </ul>
       </nav>
     </div>

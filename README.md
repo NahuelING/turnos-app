@@ -11,19 +11,31 @@ cliente, formularios controlados y validaciones del lado del cliente.
 - **Vite** — bundler y servidor de desarrollo.
 - **Tailwind CSS v4** (`@tailwindcss/vite`) — estilos utilitarios.
 - **React Router 6** — enrutamiento en cliente.
+- **Backend seguro** (nueva capa): **Flask + Blueprints + Supabase/PostgreSQL
+  con RLS + autenticación JWT + Swagger**. Ver [`backend/README.md`](backend/README.md).
 
-No hay backend real todavía: el estado del dominio (pacientes, profesionales,
-turnos) vive en un `Context + useReducer` y se persiste en `localStorage`,
-simulando la capa de persistencia mientras no está conectada la API REST de
-la arquitectura de 3 capas descrita en el informe técnico.
+El estado del dominio (pacientes, profesionales, turnos) ya no vive en
+`localStorage`: ahora está en PostgreSQL (Supabase) protegido con **Row Level
+Security** y cada request lleva un **JWT**. Los casos de uso CU03/CU04/CU05
+requieren iniciar sesión.
 
-## Instalación y ejecución
+## Ejecutar todo el stack
 
 ```bash
+# 1) Base de datos: ejecutar backend/db/schema.sql en Supabase (SQL Editor),
+#    configurar backend/.env (ver .env.example) y arrancar la API:
+cd backend
+python -m venv .venv && .venv\Scripts\activate
+pip install -r requirements.txt
+python app.py            # http://localhost:5000  (Swagger: /apidocs)
+
+# 2) Frontend:
+cd ..                    # raíz del repo
 npm install
-npm run dev      # servidor de desarrollo
-npm run build    # build de producción en /dist
+npm run dev              # Vite: http://localhost:5173
 ```
+
+Para apuntar el frontend a otra URL de API: `VITE_API_URL` (oa `http://localhost:5000`).
 
 ## Casos de uso y rutas
 

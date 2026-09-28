@@ -1,75 +1,94 @@
 import { useState } from "react";
 import { useData } from "../context/DataContext";
 import FormField, { inputClass } from "../components/FormField";
+import RequisitoSesion from "../components/RequisitoSesion";
 
 const ETIQUETA_ESTADO = {
   reservado: "bg-sage/30 text-pine",
   cancelado: "bg-brick/10 text-brick",
 };
 
-// CU04 — Consultar Turno
+// CU04 — Consultar Turno (RLS: solo devuelve turnos del usuario autenticado)
 export default function ConsultarTurno() {
   const { buscarTurnos } = useData();
   const [ci, setCI] = useState("");
   const [resultados, setResultados] = useState(null);
   const [error, setError] = useState("");
+  const [buscando, setBuscando] = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    if (!ci.trim()) {
-      setError("Ingresa el CI del paciente para buscar sus turnos.");
-      setResultados(null);
-      return;
-    }
     setError("");
-    setResultados(buscarTurnos({ ci }));
+    setBuscando(true);
+    try {
+      if (!ci.trim()) {
+        setError("Ingresa el CI del paciente para buscar sus turnos.");
+        setResultados(null);
+        return;
+      }
+      setResultados(await buscarTurnos({ ci }));
+    } catch (err) {
+      setError(err.message);
+      setResultados(null);
+    } finally {
+      setBuscando(false);
+    }
   }
 
   return (
     <section>
       <h2 className="text-2xl text-pine">Consultar turno</h2>
-      <p className="mt-1 text-sm text-ink/70">Busca los turnos de un paciente por su CI.</p>
+      <p className="mt-1 text-sm text-ink/70">
+        Busca los turnos por CI. La consulta va con tu JWT y Row Level Security
+        garantiza que solo ves turnos tuyos (de tu propia CI).
+      </p>
 
-      <form onSubmit={handleSubmit} noValidate className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="flex-1">
-          <FormField label="CI del paciente" error={error}>
-            <input
-              className={inputClass}
-              placeholder="Ej. 8452136 SC"
-              value={ci}
-              onChange={(e) => setCI(e.target.value)}
-            />
-          </FormField>
-        </div>
-        <button type="submit" className="w-full rounded-md bg-pine px-5 py-3 text-clay hover:bg-pine-light sm:w-auto sm:py-2.5">
-          Buscar
-        </button>
-      </form>
+      <RequisitoSesion>
+        <form onSubmit={handleSubmit} noValidate className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <FormField label="CI del paciente" error={error}>
+              <input
+                className={inputClass}
+                placeholder="Ej. 8452136 SC"
+                value={ci}
+                onChange={(e) => setCI(e.target.value)}
+              />
+            </FormField>
+          </div>
+          <button
+            type="submit"
+            disabled={buscando}
+            className="w-full rounded-md bg-pine px-5 py-3 text-clay hover:bg-pine-light disabled:opacity-60 sm:w-auto sm:py-2.5"
+          >
+            {buscando ? "Buscando…" : "Buscar"}
+          </button>
+        </form>
 
-      {resultados && (
-        <div className="mt-4">
-          {resultados.length === 0 ? (
-            <p className="text-sm text-ink/70">No se encontraron turnos para ese paciente.</p>
-          ) : (
-            <ul className="space-y-3">
-              {resultados.map((t) => (
-                <li key={t.idTurno} className="rounded-md border border-line bg-white p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-pine">{t.idTurno}</span>
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs ${ETIQUETA_ESTADO[t.estado]}`}>
-                      {t.estado}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm text-ink/80">
-                    {t.fecha} a las {t.hora} — {t.profesional?.nombre} {t.profesional?.apellido} (
-                    {t.profesional?.especialidad})
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+        {resultados && (
+          <div className="mt-4">
+            {resultados.length === 0 ? (
+              <p className="text-sm text-ink/70">No se encontraron turnos para ese paciente.</p>
+            ) : (
+              <ul className="space-y-3">
+                {resultados.map((t) => (
+                  <li key={t.idTurno} className="rounded-md border border-line bg-white p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-pine">{t.idTurno}</span>
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs ${ETIQUETA_ESTADO[t.estado]}`}>
+                        {t.estado}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-ink/80">
+                      {t.fecha} a las {t.hora} — {t.profesional?.nombre} {t.profesional?.apellido} (
+                      {t.profesional?.especialidad})
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </RequisitoSesion>
     </section>
   );
 }

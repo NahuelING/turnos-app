@@ -1,0 +1,1 @@
+# Blueprint de autenticación (JWT de Supabase Auth).
