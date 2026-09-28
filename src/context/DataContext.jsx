@@ -62,8 +62,8 @@ export function DataProvider({ children }) {
       password: datos.password,
     });
 
-    // Primer login solo para poder crear la ficha con el id del usuario.
-    await apiAuth.login({ username: datos.correo, password: datos.password });
+    const primerLogin = await apiAuth.login({ username: datos.correo, password: datos.password });
+    setToken(primerLogin.access_token);
 
     const res = await apiPacientes.crear({
       nombre: datos.nombre,
