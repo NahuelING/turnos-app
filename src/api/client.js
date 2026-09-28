@@ -89,5 +89,5 @@ export const apiTurnos = {
     const payload = { id_profesional: body.idProfesional, fecha: body.fecha, hora: body.hora };
     return api("POST", "/api/v1/turnos", payload);
   },
-  cancelar: (idTurno) => api("PATCH", `/api/v1/turnos/${encodeURIComponent(idTurno)}/cancelar`),
+  cancelar: (idTurno) => api("PATCH", `/api/v1/turnos/${encodeURIComponent(idTurno)}/cancelar`, {}),
 };
