@@ -62,8 +62,8 @@ export function DataProvider({ children }) {
       password: datos.password,
     });
 
-    const loginRes = await apiAuth.login({ username: datos.correo, password: datos.password });
-    setToken(loginRes.access_token);
+    // Primer login solo para poder crear la ficha con el id del usuario.
+    await apiAuth.login({ username: datos.correo, password: datos.password });
 
     const res = await apiPacientes.crear({
       nombre: datos.nombre,
@@ -73,11 +73,21 @@ export function DataProvider({ children }) {
       correo: datos.correo,
     });
 
+    // Re-login: el primer token se firmó ANTES de existir la ficha, así que no
+    // lleva "paciente_id" en el claim. Al renovarlo, la reserva (CU03) puede
+    // resolver el paciente desde el JWT sin depender de la CI.
+    const sesionRes = await apiAuth.login({ username: datos.correo, password: datos.password });
+    setToken(sesionRes.access_token);
+
     setSesion({
-      user: { id: loginRes.usuario.id, rol: loginRes.usuario.rol, email: loginRes.usuario.email },
-      paciente: res.paciente,
+      user: { id: sesionRes.usuario.id, rol: sesionRes.usuario.rol, email: sesionRes.usuario.email },
+      paciente: sesionRes.usuario.paciente,
     });
-    return { access_token: loginRes.access_token, mensaje: res.mensaje, paciente: res.paciente };
+    return {
+      access_token: sesionRes.access_token,
+      mensaje: res.mensaje,
+      paciente: sesionRes.usuario.paciente,
+    };
   }, []);
 
   const iniciarSesion = useCallback(async ({ correo, password }) => {
