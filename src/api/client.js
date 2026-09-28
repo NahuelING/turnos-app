@@ -75,7 +75,10 @@ export const apiTurnos = {
       "GET",
       `/api/v1/disponibilidad?id_profesional=${encodeURIComponent(idProfesional)}&fecha=${encodeURIComponent(fecha)}`
     );
-    return res.horarios_disponibles || [];
+    return {
+      disponibles: res.horarios_disponibles || [],
+      ocupados: res.horarios_ocupados || [],
+    };
   },
   listar: async ({ ci, idTurno } = {}) => {
     const params = new URLSearchParams();

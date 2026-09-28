@@ -106,7 +106,7 @@ export function DataProvider({ children }) {
   }, []);
 
   const getDisponibilidad = useCallback(async (idProfesional, fecha) => {
-    if (!idProfesional || !fecha) return [];
+    if (!idProfesional || !fecha) return { disponibles: [], ocupados: [] };
     return apiTurnos.disponibilidad(idProfesional, fecha);
   }, []);
 

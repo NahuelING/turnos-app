@@ -14,6 +14,7 @@ export default function ReservarTurno() {
   const [fecha, setFecha] = useState(HOY);
   const [hora, setHora] = useState("");
   const [horasDisponibles, setHorasDisponibles] = useState([]);
+  const [horasOcupadas, setHorasOcupadas] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [errores, setErrores] = useState({});
   const [mensaje, setMensaje] = useState(null);
@@ -23,13 +24,15 @@ export default function ReservarTurno() {
     let activo = true;
     if (!idProfesional || !fecha) {
       setHorasDisponibles([]);
+      setHorasOcupadas([]);
       return;
     }
     setCargando(true);
     getDisponibilidad(idProfesional, fecha)
-      .then((horas) => {
+      .then(({ disponibles, ocupados }) => {
         if (!activo) return;
-        setHorasDisponibles(horas);
+        setHorasDisponibles(disponibles);
+        setHorasOcupadas(ocupados);
         setCargando(false);
       })
       .catch(() => activo && setCargando(false));
@@ -134,6 +137,11 @@ export default function ReservarTurno() {
                 {horasDisponibles.map((h) => (
                   <option key={h} value={h}>
                     {h}
+                  </option>
+                ))}
+                {horasOcupadas.map((h) => (
+                  <option key={`ocupado-${h}`} value={h} disabled>
+                    {h} — ya reservado
                   </option>
                 ))}
               </select>
