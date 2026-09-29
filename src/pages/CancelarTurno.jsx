@@ -3,15 +3,18 @@ import { useData } from "../context/DataContext";
 import FormField, { inputClass } from "../components/FormField";
 import RequisitoSesion from "../components/RequisitoSesion";
 
-// CU05 — Cancelar Turno (la API cancela via PATCH solo turnos del usuario; RLS)
+// CU05 — Cancelar Turno. La cancelación es una operación de personal: el
+// paciente consulta su turno, pero solo el personal administrativo puede
+// anularlo (el backend exige rol admin). Un paciente debe pedirlo en recepción.
 export default function CancelarTurno() {
-  const { buscarTurnos, cancelarTurno } = useData();
+  const { buscarTurnos, cancelarTurno, sesion } = useData();
   const [idTurno, setIdTurno] = useState("");
   const [turno, setTurno] = useState(null);
   const [error, setError] = useState("");
   const [confirmado, setConfirmado] = useState(false);
   const [buscando, setBuscando] = useState(false);
   const [cancelando, setCancelando] = useState(false);
+  const esAdmin = sesion?.user?.rol === "admin";
 
   async function handleBuscar(e) {
     e.preventDefault();
@@ -41,10 +44,14 @@ export default function CancelarTurno() {
 
   async function handleCancelar() {
     setCancelando(true);
+    setError("");
     try {
-      await cancelarTurno(turno.idTurno);
+      const res = await cancelarTurno(turno.idTurno);
       setConfirmado(true);
-      setTurno({ ...turno, estado: "cancelado" });
+      // Se toma el turno que devuelve la API, no una copia local: así lo que
+      // muestra la pantalla es exactamente lo que quedó guardado.
+      const actualizado = res?.turno || (await buscarTurnos({ idTurno: turno.idTurno }))[0];
+      setTurno(actualizado ? { ...turno, ...actualizado } : { ...turno, estado: "cancelado" });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -55,7 +62,10 @@ export default function CancelarTurno() {
   return (
     <section>
       <h2 className="text-2xl text-pine">Cancelar turno</h2>
-      <p className="mt-1 text-sm text-ink/70">Busca el turno por su código para cancelarlo.</p>
+      <p className="mt-1 text-sm text-ink/70">
+        Busca el turno por su código. Si sos paciente, la cancelación la realiza
+        el personal del centro: pedila en recepción indicando el código.
+      </p>
 
       <RequisitoSesion>
         <form onSubmit={handleBuscar} noValidate className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -91,7 +101,7 @@ export default function CancelarTurno() {
               <p className="mt-3 text-sm font-medium text-brick">
                 {confirmado ? "Turno cancelado correctamente." : "Este turno ya estaba cancelado."}
               </p>
-            ) : (
+            ) : esAdmin ? (
               <button
                 onClick={handleCancelar}
                 disabled={cancelando}
@@ -99,6 +109,11 @@ export default function CancelarTurno() {
               >
                 {cancelando ? "Cancelando…" : "Cancelar este turno"}
               </button>
+            ) : (
+              <p className="mt-3 rounded-md border border-line bg-ink/5 px-3 py-2 text-sm text-ink/70">
+                Para cancelar este turno, comunícate con recepción del centro de salud
+                indicando el código <span className="font-medium text-pine">{turno.idTurno}</span>.
+              </p>
             )}
           </div>
         )}

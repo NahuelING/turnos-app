@@ -93,4 +93,12 @@ export const apiTurnos = {
     return api("POST", "/api/v1/turnos", payload);
   },
   cancelar: (idTurno) => api("PATCH", `/api/v1/turnos/${encodeURIComponent(idTurno)}/cancelar`, {}),
+  // Agenda del profesional autenticado: el backend la acota a su propio calendario.
+  misTurnos: async () => {
+    const res = await api("GET", "/api/v1/turnos");
+    return res.turnos || [];
+  },
+  // Registra (o deshace) la atención del paciente. Solo el médico del turno o un admin.
+  registrarAtencion: (idTurno, atendido = true) =>
+    api("PATCH", `/api/v1/turnos/${encodeURIComponent(idTurno)}/atender`, { atendido }),
 };

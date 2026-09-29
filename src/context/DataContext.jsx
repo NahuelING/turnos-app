@@ -16,7 +16,7 @@ const DataContext = createContext(null);
 export function DataProvider({ children }) {
   const [profesionales, setProfesionales] = useState([]);
   const [catalogoError, setCatalogoError] = useState("");
-  const [sesion, setSesion] = useState(null); // { user: {id, rol}, paciente }
+  const [sesion, setSesion] = useState(null); // { user: {id, rol, email}, paciente, profesional }
   const [cargandoSesion, setCargandoSesion] = useState(true);
 
   useEffect(() => {
@@ -35,7 +35,11 @@ export function DataProvider({ children }) {
           const res = await apiAuth.me();
           const u = res.usuario;
           if (activo) {
-            setSesion({ user: { id: u.id, rol: u.rol, email: u.email }, paciente: u.paciente });
+            setSesion({
+              user: { id: u.id, rol: u.rol, email: u.email },
+              paciente: u.paciente,
+              profesional: u.profesional,
+            });
           }
         } catch {
           setToken(null); // token vencido/revocado -> se descarta
@@ -82,6 +86,7 @@ export function DataProvider({ children }) {
     setSesion({
       user: { id: sesionRes.usuario.id, rol: sesionRes.usuario.rol, email: sesionRes.usuario.email },
       paciente: sesionRes.usuario.paciente,
+      profesional: sesionRes.usuario.profesional,
     });
     return {
       access_token: sesionRes.access_token,
@@ -96,6 +101,7 @@ export function DataProvider({ children }) {
     setSesion({
       user: { id: res.usuario.id, rol: res.usuario.rol, email: res.usuario.email },
       paciente: res.usuario.paciente,
+      profesional: res.usuario.profesional,
     });
     return res;
   }, []);
@@ -127,6 +133,16 @@ export function DataProvider({ children }) {
     return apiTurnos.cancelar(idTurno);
   }, []);
 
+  // Agenda del profesional autenticado. El backend la acota a su propio calendario
+  // (nunca ve los turnos de otros profesionales).
+  const misTurnos = useCallback(async () => {
+    return apiTurnos.misTurnos();
+  }, []);
+
+  const registrarAtencion = useCallback(async (idTurno, atendido = true) => {
+    return apiTurnos.registrarAtencion(idTurno, atendido);
+  }, []);
+
   const api = {
     profesionales,
     catalogoError,
@@ -140,6 +156,8 @@ export function DataProvider({ children }) {
     reservarTurno,
     buscarTurnos,
     cancelarTurno,
+    misTurnos,
+    registrarAtencion,
   };
 
   return <DataContext.Provider value={api}>{children}</DataContext.Provider>;

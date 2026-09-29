@@ -9,16 +9,41 @@ const HOY = new Date().toISOString().slice(0, 10);
 // CU03 — Reservar Turno (requiere sesión JWT; el backend resuelve el paciente
 // desde el token, no confía en un idPaciente que mande el cliente).
 export default function ReservarTurno() {
-  const { profesionales, getDisponibilidad, reservarTurno, sesion } = useData();
+  const { profesionales, getDisponibilidad, reservarTurno, buscarTurnos, sesion } = useData();
   const [idProfesional, setIdProfesional] = useState("");
   const [fecha, setFecha] = useState(HOY);
   const [hora, setHora] = useState("");
   const [horasDisponibles, setHorasDisponibles] = useState([]);
   const [horasOcupadas, setHorasOcupadas] = useState([]);
+  const [turnoDelDia, setTurnoDelDia] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [errores, setErrores] = useState({});
   const [mensaje, setMensaje] = useState(null);
   const [enviando, setEnviando] = useState(false);
+
+  // Regla de negocio: un paciente no puede tener más de un turno en el mismo día,
+  // sin importar el horario ni el profesional. Cuenta tanto 'reservado' como
+  // 'atendido' (un turno atendido sigue ocupando el día); solo 'cancelado' libera.
+  useEffect(() => {
+    let activo = true;
+    if (!sesion || !fecha) {
+      setTurnoDelDia(null);
+      return;
+    }
+    buscarTurnos({})
+      .then((turnos) => {
+        if (!activo) return;
+        const choque = (turnos || []).find(
+          (t) => t.estado !== "cancelado" && t.fecha === fecha
+        );
+        setTurnoDelDia(choque || null);
+        if (choque) setHora("");
+      })
+      .catch(() => activo && setTurnoDelDia(null));
+    return () => {
+      activo = false;
+    };
+  }, [fecha, sesion, buscarTurnos]);
 
   useEffect(() => {
     let activo = true;
@@ -45,6 +70,11 @@ export default function ReservarTurno() {
     e.preventDefault();
     setMensaje(null);
 
+    if (turnoDelDia) {
+      setErrores({ fecha: "Ya tenés un turno reservado ese día." });
+      return;
+    }
+
     const nuevosErrores = {
       idProfesional: validarSeleccion(idProfesional, "Elige un profesional."),
       fecha: validarSeleccion(fecha, "Elige una fecha."),
@@ -61,6 +91,7 @@ export default function ReservarTurno() {
       setHora("");
       return;
     }
+    setTurnoDelDia(resultado.turno);
     setMensaje({
       tipo: "ok",
       texto: `Turno ${resultado.turno.idTurno} reservado para el ${fecha} a las ${hora}.`,
@@ -74,13 +105,21 @@ export default function ReservarTurno() {
       <p className="mt-1 text-sm text-ink/70">
         El paciente debe estar previamente registrado (CU01). La reserva se hace
         con tu sesión (JWT) y se valida de nuevo contra la agenda en la base de
-        datos para evitar choques de horario.
+        datos para evitar choques de horario. Solo se permite un turno por día.
       </p>
 
       <RequisitoSesion>
         {sesion && (
           <p className="mt-4 text-sm text-pine">
             Reservando para: <NombreEnSesion />
+          </p>
+        )}
+
+        {turnoDelDia && (
+          <p className="mt-6 rounded-md border border-brick/40 bg-white px-4 py-3 text-sm text-brick">
+            Ya tenés un turno reservado el {turnoDelDia.fecha} a las {turnoDelDia.hora}. Solo se
+            permite un turno por día: elegí otra fecha. Si necesitás anularlo, pedilo en recepción
+            del centro de salud.
           </p>
         )}
 
@@ -125,32 +164,45 @@ export default function ReservarTurno() {
             />
           </FormField>
           <div className="sm:col-span-2">
-            <FormField label="Horario" error={errores.hora}>
-              <select className={inputClass} value={hora} onChange={(e) => setHora(e.target.value)}>
-                <option value="">
-                  {idProfesional && fecha
+            <FormField label="Horario disponible" error={errores.hora}>
+            <select
+              className={inputClass}
+              value={hora}
+              onChange={(e) => setHora(e.target.value)}
+              disabled={!!turnoDelDia}
+            >
+              <option value="">
+                {turnoDelDia
+                  ? "Ya tenés un turno ese día"
+                  : idProfesional && fecha
                     ? cargando
                       ? "Consultando…"
-                      : "Selecciona un horario..."
-                    : "Elige profesional y fecha primero"}
-                </option>
+                      : horasDisponibles.length === 0
+                        ? "No quedan horarios libres para ese día"
+                        : "Selecciona un horario..."
+                    : "Elegí un profesional para ver sus horarios"}
+              </option>
+
+                {/* Solo se listan las horas libres. Las ocupadas no aparecen:
+                    no hay nada que elegir y únicamente confundían al paciente. */}
                 {horasDisponibles.map((h) => (
                   <option key={h} value={h}>
                     {h}
                   </option>
                 ))}
-                {horasOcupadas.map((h) => (
-                  <option key={`ocupado-${h}`} value={h} disabled>
-                    {h} — ya reservado
-                  </option>
-                ))}
               </select>
+              {idProfesional && fecha && !cargando && !turnoDelDia && horasOcupadas.length > 0 && (
+                <p className="mt-1 text-xs text-ink/60">
+                  {horasOcupadas.length} horario{horasOcupadas.length > 1 ? "s" : ""} ya
+                  reservado{horasOcupadas.length > 1 ? "s" : ""} ese día.
+                </p>
+              )}
             </FormField>
           </div>
           <div className="sm:col-span-2">
             <button
               type="submit"
-              disabled={enviando}
+              disabled={enviando || !!turnoDelDia}
               className="w-full rounded-md bg-pine px-5 py-3 text-clay hover:bg-pine-light disabled:opacity-60 sm:w-auto sm:py-2.5"
             >
               {enviando ? "Reservando…" : "Confirmar reserva"}

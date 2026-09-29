@@ -1,37 +1,57 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useData } from "../context/DataContext";
-import FormField, { inputClass } from "../components/FormField";
 import RequisitoSesion from "../components/RequisitoSesion";
 
 const ETIQUETA_ESTADO = {
   reservado: "bg-sage/30 text-pine",
-  cancelado: "bg-brick/10 text-brick",
+  atendido: "bg-sun/30 text-pine",
+  cancelado: "bg-brick/10 text-brick line-through",
 };
 
-// CU04 — Consultar Turno (RLS: solo devuelve turnos del usuario autenticado)
+// CU04 — Consultar Turno. Los turnos se cargan solos al entrar, sin escribir la
+// CI: la identidad viene del JWT, así que no tiene sentido pedir un dato que el
+// backend ya conoce y que además el propio paciente podría cambiar por error.
+// El backend acota el listado al paciente del token (o a la agenda completa si
+// sos recepción/admin), por eso no hace falta ningún filtro del lado del cliente.
 export default function ConsultarTurno() {
-  const { buscarTurnos } = useData();
-  const [ci, setCI] = useState("");
-  const [resultados, setResultados] = useState(null);
+  const { buscarTurnos, cancelarTurno, sesion } = useData();
+  const [turnos, setTurnos] = useState([]);
+  const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
-  const [buscando, setBuscando] = useState(false);
+  const [procesando, setProcesando] = useState(null);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  const esAdmin = sesion?.user?.rol === "admin" || sesion?.user?.rol === "recepcionista";
+
+  const cargar = useCallback(async () => {
+    setCargando(true);
     setError("");
-    setBuscando(true);
     try {
-      if (!ci.trim()) {
-        setError("Ingresa el CI del paciente para buscar sus turnos.");
-        setResultados(null);
-        return;
-      }
-      setResultados(await buscarTurnos({ ci }));
+      setTurnos(await buscarTurnos({}));
     } catch (err) {
       setError(err.message);
-      setResultados(null);
+      setTurnos([]);
     } finally {
-      setBuscando(false);
+      setCargando(false);
+    }
+  }, [buscarTurnos]);
+
+  // Carga directa al entrar: es el propósito de exigir inicio de sesión.
+  useEffect(() => {
+    if (sesion) cargar();
+  }, [sesion, cargar]);
+
+  async function handleCancelar(turno) {
+    setProcesando(turno.idTurno);
+    setError("");
+    try {
+      await cancelarTurno(turno.idTurno);
+      // Se recarga desde la API: el estado que se ve es el que quedó guardado,
+      // no una copia optimista que pueda desincronizarse.
+      await cargar();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setProcesando(null);
     }
   }
 
@@ -39,54 +59,55 @@ export default function ConsultarTurno() {
     <section>
       <h2 className="text-2xl text-pine">Consultar turno</h2>
       <p className="mt-1 text-sm text-ink/70">
-        Busca los turnos por CI. La consulta va con tu JWT y Row Level Security
-        garantiza que solo ves turnos tuyos (de tu propia CI).
+        {esAdmin
+          ? "Turnos del centro de salud. Podés cancelar cualquiera desde acá."
+          : "Estos son los turnos de tu ficha. Se cargan solos con tu sesión iniciada."}
       </p>
 
       <RequisitoSesion>
-        <form onSubmit={handleSubmit} noValidate className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <FormField label="CI del paciente" error={error}>
-              <input
-                className={inputClass}
-                placeholder="Ej. 8452136 SC"
-                value={ci}
-                onChange={(e) => setCI(e.target.value)}
-              />
-            </FormField>
-          </div>
-          <button
-            type="submit"
-            disabled={buscando}
-            className="w-full rounded-md bg-pine px-5 py-3 text-clay hover:bg-pine-light disabled:opacity-60 sm:w-auto sm:py-2.5"
-          >
-            {buscando ? "Buscando…" : "Buscar"}
-          </button>
-        </form>
+        {error && (
+          <p className="mt-4 rounded-md border border-brick/40 bg-white px-4 py-3 text-sm text-brick">
+            {error}
+          </p>
+        )}
 
-        {resultados && (
-          <div className="mt-4">
-            {resultados.length === 0 ? (
-              <p className="text-sm text-ink/70">No se encontraron turnos para ese paciente.</p>
-            ) : (
-              <ul className="space-y-3">
-                {resultados.map((t) => (
-                  <li key={t.idTurno} className="rounded-md border border-line bg-white p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-pine">{t.idTurno}</span>
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs ${ETIQUETA_ESTADO[t.estado]}`}>
-                        {t.estado}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm text-ink/80">
-                      {t.fecha} a las {t.hora} — {t.profesional?.nombre} {t.profesional?.apellido} (
-                      {t.profesional?.especialidad})
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+        {cargando ? (
+          <p className="mt-4 text-sm text-ink/70">Cargando tus turnos…</p>
+        ) : turnos.length === 0 ? (
+          <p className="mt-4 rounded-md border border-line bg-white px-4 py-3 text-sm text-ink/70">
+            No tenés turnos registrados. Podés reservar uno desde la sección "Reservar turno".
+          </p>
+        ) : (
+          <ul className="mt-4 space-y-3">
+            {turnos.map((t) => (
+              <li key={t.idTurno} className="rounded-md border border-line bg-white p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium text-pine">{t.idTurno}</span>
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs ${ETIQUETA_ESTADO[t.estado]}`}>
+                    {t.estado}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-ink/80">
+                  {t.fecha} a las {t.hora} — {t.profesional?.nombre} {t.profesional?.apellido} (
+                  {t.profesional?.especialidad})
+                </p>
+                {esAdmin && (
+                  <p className="mt-1 text-xs text-ink/60">
+                    Paciente: {t.paciente?.nombre} {t.paciente?.apellido} (CI {t.paciente?.ci})
+                  </p>
+                )}
+                {esAdmin && t.estado !== "cancelado" && (
+                  <button
+                    onClick={() => handleCancelar(t)}
+                    disabled={procesando === t.idTurno}
+                    className="mt-3 rounded-md border border-brick px-3 py-1.5 text-xs text-brick hover:bg-brick/5 disabled:opacity-60"
+                  >
+                    {procesando === t.idTurno ? "Cancelando…" : "Cancelar este turno"}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
       </RequisitoSesion>
     </section>
