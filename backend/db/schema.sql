@@ -65,6 +65,14 @@ create unique index if not exists turnos_slot_unico_reservado
   on public.turnos (idProfesional, fecha, hora)
   where estado = 'reservado';
 
+-- Regla de negocio: un paciente NO puede tener dos turnos activos el mismo día,
+-- sin importar el horario ni el profesional. Es el backstop atómico de la
+-- validación en la API (evita carreras entre dos peticiones simultáneas).
+-- Cancelado queda fuera del índice, así un turno cancelado libera el día.
+create unique index if not exists turnos_paciente_un_turno_por_dia
+  on public.turnos (idPaciente, fecha)
+  where estado = 'reservado';
+
 -- =============================================================================
 -- 2) ROW LEVEL SECURITY
 -- =============================================================================

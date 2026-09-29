@@ -125,7 +125,7 @@ def reservar():
             hora: {type: string, example: "08:00"}
     responses:
       201: {description: Turno creado}
-      400: {description: Horario ocupado, profesional inválido o sin ficha de paciente}
+      400: {description: Horario ocupado, profesional inválido, sin ficha de paciente, o el paciente ya tiene un turno ese día}
       401: {description: Token inválido/expirado}
     """
     data = request.get_json(silent=True) or {}
@@ -149,6 +149,24 @@ def reservar():
         return jsonify({"error": "Registra tu ficha de paciente antes de reservar (CU01)"}), 400
     id_paciente = paciente_filas[0]["idpaciente"]
 
+    # Regla de negocio: un paciente solo puede tener UN turno reservado por dia,
+    # sin importar el horario ni el profesional. Si ya tiene uno, se rechaza.
+    turno_del_dia = _ejecutar_seguro(
+        make_client(g.token)
+        .table("turnos")
+        .select("idturno, hora, idprofesional")
+        .eq("idpaciente", id_paciente)
+        .eq("fecha", fecha)
+        .eq("estado", "reservado")
+        .limit(1)
+    )
+    if turno_del_dia is None:
+        return jsonify({"error": "Error verificando tus turnos del dia"}), 500
+    if turno_del_dia:
+        return jsonify({
+            "error": "Ya tenes un turno reservado ese dia. Solo se permite un turno por dia."
+        }), 400
+
     libres = disponibilidad_interna(id_profesional, fecha)
     if libres is None:
         return jsonify({"error": "Error verificando disponibilidad"}), 500
@@ -168,9 +186,11 @@ def reservar():
     try:
         insertado = make_client(g.token).table("turnos").insert(turno).execute().data[0]
     except ApiError as exc:
-        # unique (idProfesional, fecha, hora) u otra violación de RLS
-        if "duplicate" in (exc.message or "").lower():
-            return jsonify({"error": "Ese horario ya no está disponible. Elige otro."}), 400
+        # Violacion de los indices unicos: slot ocupado (idProfesional, fecha, hora)
+        # o regla de un turno por dia (idPaciente, fecha).
+        mensaje = (exc.message or "").lower()
+        if "duplicate" in mensaje or "23505" in mensaje:
+            return jsonify({"error": "Ese horario ya no esta disponible. Elige otro."}), 400
         return jsonify({"error": f"No se pudo reservar: {exc.message}"}), 400
 
     return jsonify(insertado), 201
