@@ -10,6 +10,11 @@ const enlaces = [
   { to: "/cancelar", label: "Cancelar turno", corta: "Cancelar" },
 ];
 
+// El personal médico solo accede a su agenda de consulta.
+const enlacesMedico = [
+  { to: "/mis-pacientes", label: "Mis pacientes", corta: "Pacientes" },
+];
+
 const iconos = {
   "registrar-paciente": (
     <>
@@ -48,6 +53,13 @@ const iconos = {
       <line x1="9" y1="9" x2="15" y2="15" />
     </>
   ),
+  "mis-pacientes": (
+    <>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+    </>
+  ),
 };
 
 function Icono({ nombre }) {
@@ -69,11 +81,17 @@ function Icono({ nombre }) {
 
 export default function Layout() {
   const { sesion, cerrarSesion } = useData();
-  const nombreSesion = sesion?.paciente
-    ? `${sesion.paciente.nombre} ${sesion.paciente.apellido}`
-    : sesion?.user?.email;
-  const esPaciente = sesion?.user?.rol === "paciente";
-  const enlacesVisibles = enlaces.filter((e) => !(esPaciente && e.to === "/registrar-paciente"));
+  const rol = sesion?.user?.rol;
+  const esMedico = rol === "medico";
+  const esPaciente = rol === "paciente";
+  const nombreSesion = sesion?.profesional
+    ? `${sesion.profesional.nombre} ${sesion.profesional.apellido}`
+    : sesion?.paciente
+      ? `${sesion.paciente.nombre} ${sesion.paciente.apellido}`
+      : sesion?.user?.email;
+  const enlacesVisibles = esMedico
+    ? enlacesMedico
+    : enlaces.filter((e) => !(esPaciente && e.to === "/registrar-paciente"));
 
   return (
     <div className="min-h-screen bg-clay">
